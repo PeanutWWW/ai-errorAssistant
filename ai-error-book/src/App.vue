@@ -10,18 +10,47 @@ const showResult = ref(false)
 
 const resultData = ref(null)
 
-const handleUploadChange = (uploadFile) => {
+const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        let width = img.width
+        let height = img.height
+        if (width > maxWidth) {
+          height = Math.round(height * (maxWidth / width))
+          width = maxWidth
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = reject
+      img.src = e.target.result
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+const handleUploadChange = async (uploadFile) => {
   const raw = uploadFile.raw
   if (!raw) return
   if (!raw.type.startsWith('image/')) {
     ElMessage.error('请上传图片文件')
     return
   }
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    imageUrl.value = e.target.result
+  try {
+    ElMessage.info('正在压缩图片...')
+    imageUrl.value = await compressImage(raw)
+    ElMessage.success('图片上传成功')
+  } catch {
+    ElMessage.error('图片处理失败')
   }
-  reader.readAsDataURL(raw)
 }
 
 const removeImage = () => {
