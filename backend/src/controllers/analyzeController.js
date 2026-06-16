@@ -18,14 +18,10 @@ async function analyze(req, res, next) {
       })
     }
 
-    if (!hasQuestion && hasImage) {
-      return res.status(400).json({
-        success: false,
-        message: 'AI 暂不支持直接识别图片，请补充输入题目文字或描述图片内容'
-      })
-    }
-
-    const result = await deepseekService.analyzeQuestion(question.trim())
+    const result = await deepseekService.analyzeQuestion(
+      hasQuestion ? question.trim() : '',
+      hasImage ? image.trim() : ''
+    )
 
     return res.json({
       success: true,

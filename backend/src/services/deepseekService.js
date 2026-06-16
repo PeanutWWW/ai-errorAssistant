@@ -2,8 +2,8 @@ const OpenAI = require('openai')
 const config = require('../config')
 
 const client = new OpenAI({
-  apiKey: config.deepseek.apiKey,
-  baseURL: config.deepseek.baseURL
+  apiKey: config.ai.apiKey,
+  baseURL: config.ai.baseURL
 })
 
 const SYSTEM_PROMPT = `你是一位专业的中学数学辅导老师，擅长分析初中和高中数学题目。
@@ -22,29 +22,46 @@ const SYSTEM_PROMPT = `你是一位专业的中学数学辅导老师，擅长分
 7. 所有内容使用中文，面向初中和高中学生理解水平
 `
 
-const DEFAULT_PROMPT = '请分析以下题目，给出详细的诊断分析。'
+const DEFAULT_PROMPT = '请分析图片中的这道题目，给出详细的诊断分析。'
 
 /**
- * 调用 DeepSeek Chat API 分析错题
+ * 调用 Qwen-VL API 分析错题（支持图片+文字多模态）
  * @param {string} question 题目文本
+ * @param {string} image 图片 base64 data URL（可选）
  * @returns {Promise<Object>} 解析后的 JSON 对象
  */
-async function analyzeQuestion(question) {
+async function analyzeQuestion(question, image) {
+  const content = []
+
+  // 文字提示
+  const promptText = (question && question.trim())
+    ? `请分析以下错题：\n\n${question.trim()}`
+    : DEFAULT_PROMPT
+  content.push({ type: 'text', text: promptText })
+
+  // 图片（如提供）
+  if (image) {
+    content.push({
+      type: 'image_url',
+      image_url: { url: image }
+    })
+  }
+
   const response = await client.chat.completions.create({
-    model: config.deepseek.model,
+    model: config.ai.model,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `请分析以下错题：\n\n${question || DEFAULT_PROMPT}` }
+      { role: 'user', content }
     ],
     temperature: 0.7,
     max_tokens: 2048
   })
 
-  const content = response.choices[0]?.message?.content || ''
+  const contentText = response.choices[0]?.message?.content || ''
 
   // 尝试提取 JSON（兼容代码块包裹的情况）
-  const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/```\s*([\s\S]*?)\s*```/)
-  const jsonString = jsonMatch ? jsonMatch[1].trim() : content.trim()
+  const jsonMatch = contentText.match(/```json\s*([\s\S]*?)\s*```/) || contentText.match(/```\s*([\s\S]*?)\s*```/)
+  const jsonString = jsonMatch ? jsonMatch[1].trim() : contentText.trim()
 
   try {
     return JSON.parse(jsonString)
