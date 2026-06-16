@@ -46,7 +46,7 @@ const startAnalysis = async () => {
   showResult.value = false
 
   try {
-    const { data } = await axios.post('http://localhost:3000/api/analyze', {
+    const { data } = await axios.post('https://romantic-charm-production-93bd.up.railway.app/api/analyze', {
       question: questionText.value.trim()
     })
 
