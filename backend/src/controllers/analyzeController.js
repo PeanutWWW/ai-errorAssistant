@@ -6,16 +6,22 @@ const deepseekService = require('../services/deepseekService')
  */
 async function analyze(req, res, next) {
   try {
-    const { question } = req.body
+    const { question, image } = req.body
 
-    if (!question || typeof question !== 'string' || question.trim().length === 0) {
+    const hasQuestion = question && typeof question === 'string' && question.trim().length > 0
+    const hasImage = image && typeof image === 'string' && image.trim().length > 0
+
+    if (!hasQuestion && !hasImage) {
       return res.status(400).json({
         success: false,
-        message: '请求参数错误：question 不能为空'
+        message: '请上传题目图片或输入题目内容'
       })
     }
 
-    const result = await deepseekService.analyzeQuestion(question.trim())
+    const result = await deepseekService.analyzeQuestion(
+      hasQuestion ? question.trim() : '',
+      hasImage ? image.trim() : ''
+    )
 
     return res.json({
       success: true,

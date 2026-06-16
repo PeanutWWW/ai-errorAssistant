@@ -46,9 +46,14 @@ const startAnalysis = async () => {
   showResult.value = false
 
   try {
-    const { data } = await axios.post('https://romantic-charm-production-93bd.up.railway.app/api/analyze', {
+    const payload = {
       question: questionText.value.trim()
-    })
+    }
+    if (imageUrl.value) {
+      payload.image = imageUrl.value
+    }
+
+    const { data } = await axios.post('https://romantic-charm-production-93bd.up.railway.app/api/analyze', payload)
 
     if (data.success && data.data) {
       resultData.value = data.data

@@ -22,20 +22,48 @@ const SYSTEM_PROMPT = `你是一位专业的中学数学辅导老师，擅长分
 7. 所有内容使用中文，面向初中和高中学生理解水平
 `
 
+const DEFAULT_IMAGE_PROMPT = '请分析图片中的这道题目，给出详细的诊断分析。'
+
 /**
  * 调用 DeepSeek Chat API 分析错题
- * @param {string} question 题目文本
+ * @param {string} question 题目文本（可选）
+ * @param {string} image 图片 Base64 Data URL（可选）
  * @returns {Promise<Object>} 解析后的 JSON 对象
  */
-async function analyzeQuestion(question) {
+async function analyzeQuestion(question, image) {
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT }
+  ]
+
+  if (image) {
+    // 多模态：构造包含图片的 message
+    const content = []
+
+    if (question) {
+      content.push({ type: 'text', text: `请分析以下错题：\n\n${question}` })
+    } else {
+      content.push({ type: 'text', text: DEFAULT_IMAGE_PROMPT })
+    }
+
+    content.push({
+      type: 'image_url',
+      image_url: { url: image }
+    })
+
+    messages.push({ role: 'user', content })
+  } else {
+    // 纯文本
+    messages.push({
+      role: 'user',
+      content: `请分析以下错题：\n\n${question || DEFAULT_IMAGE_PROMPT}`
+    })
+  }
+
   const response = await client.chat.completions.create({
     model: config.deepseek.model,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `请分析以下错题：\n\n${question}` }
-    ],
+    messages,
     temperature: 0.7,
-    max_tokens: 1500
+    max_tokens: 2048
   })
 
   const content = response.choices[0]?.message?.content || ''
