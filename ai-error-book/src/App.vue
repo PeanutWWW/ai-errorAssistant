@@ -133,6 +133,7 @@ const startAnalysis = async () => {
               v-if="!imageUrl"
               drag
               action="#"
+              accept="image/*"
               :auto-upload="false"
               :on-change="handleUploadChange"
               :show-file-list="false"

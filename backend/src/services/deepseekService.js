@@ -47,26 +47,36 @@ async function analyzeQuestion(question, image) {
     })
   }
 
-  const response = await client.chat.completions.create({
-    model: config.ai.model,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content }
-    ],
-    temperature: 0.7,
-    max_tokens: 2048
-  })
-
-  const contentText = response.choices[0]?.message?.content || ''
-
-  // 尝试提取 JSON（兼容代码块包裹的情况）
-  const jsonMatch = contentText.match(/```json\s*([\s\S]*?)\s*```/) || contentText.match(/```\s*([\s\S]*?)\s*```/)
-  const jsonString = jsonMatch ? jsonMatch[1].trim() : contentText.trim()
+  console.log('[Qwen-VL] request model:', config.ai.model, '| content items:', content.length)
 
   try {
-    return JSON.parse(jsonString)
+    const response = await client.chat.completions.create({
+      model: config.ai.model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content }
+      ],
+      temperature: 0.7,
+      max_tokens: 2048
+    })
+
+    const contentText = response.choices[0]?.message?.content || ''
+    console.log('[Qwen-VL] response length:', contentText.length)
+
+    // 尝试提取 JSON（兼容代码块包裹的情况）
+    const jsonMatch = contentText.match(/```json\s*([\s\S]*?)\s*```/) || contentText.match(/```\s*([\s\S]*?)\s*```/)
+    const jsonString = jsonMatch ? jsonMatch[1].trim() : contentText.trim()
+
+    try {
+      return JSON.parse(jsonString)
+    } catch (err) {
+      console.error('[Qwen-VL] JSON parse failed. Raw content:', contentText.substring(0, 200))
+      throw new Error('AI 返回内容无法解析为 JSON: ' + err.message)
+    }
   } catch (err) {
-    throw new Error('AI 返回内容无法解析为 JSON: ' + err.message)
+    console.error('[Qwen-VL] API call failed:', err.message)
+    console.error('[Qwen-VL] Error details:', err.status, err.code, err.type)
+    throw err
   }
 }
 

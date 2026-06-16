@@ -3,6 +3,7 @@
  */
 function errorHandler(err, req, res, next) {
   console.error('[Error]', err.message)
+  console.error('[Error Stack]', err.stack)
 
   // DeepSeek API 相关错误
   if (err.status || err.code) {
@@ -15,8 +16,10 @@ function errorHandler(err, req, res, next) {
   // 通用服务器错误
   res.status(500).json({
     success: false,
-    message: process.env.NODE_ENV === 'production' ? '服务器内部错误' : err.message
+    message: err.message || '服务器内部错误'
   })
 }
 
-module.exports = errorHandler
+module.exports = {
+  errorHandler
+}
