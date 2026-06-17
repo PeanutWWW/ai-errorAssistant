@@ -80,6 +80,54 @@ async function analyzeQuestion(question, image) {
   }
 }
 
+const CHAT_SYSTEM_PROMPT = `你是一位耐心的中学数学辅导老师，擅长用通俗易懂的方式解答初中和高中数学问题。
+
+请遵循以下原则：
+1. 回答要清晰、有条理，适合中学生理解
+2. 对于概念性问题，先讲原理再举例
+3. 对于解题问题，给出完整的解题思路和步骤
+4. 鼓励学生思考，适当引导而不是直接给答案
+5. 使用中文回答
+6. 可以适当使用 Markdown 格式让回答更易读
+`
+
+/**
+ * 调用 Qwen API 进行对话
+ * @param {string} message 用户消息
+ * @param {Array} history 历史对话记录 [{role, content}, ...]
+ * @returns {Promise<Object>} { reply: string }
+ */
+async function chat(message, history = []) {
+  const messages = [
+    { role: 'system', content: CHAT_SYSTEM_PROMPT }
+  ]
+
+  // 添加历史记录
+  history.forEach(h => {
+    if (h.role && h.content) {
+      messages.push({ role: h.role, content: h.content })
+    }
+  })
+
+  // 添加当前消息
+  messages.push({ role: 'user', content: message })
+
+  console.log('[Chat] messages count:', messages.length)
+
+  const response = await client.chat.completions.create({
+    model: config.ai.model,
+    messages,
+    temperature: 0.8,
+    max_tokens: 2048
+  })
+
+  const reply = response.choices[0]?.message?.content || ''
+  console.log('[Chat] reply length:', reply.length)
+
+  return { reply }
+}
+
 module.exports = {
-  analyzeQuestion
+  analyzeQuestion,
+  chat
 }

@@ -1,6 +1,7 @@
 const express = require('express')
 const cors = require('cors')
 const analyzeRouter = require('./routes/analyze')
+const chatRouter = require('./routes/chat')
 const errorHandler = require('./middlewares/errorHandler')
 
 const app = express()
@@ -17,6 +18,7 @@ app.get('/health', (req, res) => {
 
 // 业务路由
 app.use('/api/analyze', analyzeRouter)
+app.use('/api/chat', chatRouter)
 
 // 404 处理
 app.use((req, res) => {

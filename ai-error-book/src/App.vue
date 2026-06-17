@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
+import ChatWidget from './components/ChatWidget.vue'
 
 const questionText = ref('')
 const imageUrl = ref('')
@@ -285,6 +286,7 @@ const startAnalysis = async () => {
       </section>
     </main>
   </div>
+  <ChatWidget />
 </template>
 
 <style scoped>
