@@ -1,5 +1,6 @@
 const OpenAI = require('openai')
 const config = require('../config')
+const { jsonrepair } = require('jsonrepair')
 
 const client = new OpenAI({
   apiKey: config.ai.apiKey,
@@ -68,10 +69,26 @@ async function analyzeQuestion(question, image) {
     const jsonString = jsonMatch ? jsonMatch[1].trim() : contentText.trim()
 
     try {
+      // 先尝试直接解析
       return JSON.parse(jsonString)
     } catch (err) {
-      console.error('[Qwen-VL] JSON parse failed. Raw content:', contentText.substring(0, 200))
-      throw new Error('AI 返回内容无法解析为 JSON: ' + err.message)
+      // 尝试用 jsonrepair 自动修复常见 JSON 错误
+      try {
+        const repaired = jsonrepair(jsonString)
+        console.log('[Qwen-VL] JSON repaired successfully')
+        return JSON.parse(repaired)
+      } catch (repairErr) {
+        console.error('[Qwen-VL] JSON parse failed. Raw content:', contentText.substring(0, 300))
+        console.error('[Qwen-VL] Parse error:', err.message)
+        // 降级：返回包含原始文本的结构，避免前端报 500
+        return {
+          knowledge: '解析异常',
+          reason: 'AI 返回的格式包含非法字符，以下为原始分析内容：',
+          solution: contentText,
+          exercise: '请重试，或改用文字输入题目',
+          suggestion: '如果持续出现此问题，建议截图后手动输入题目文字'
+        }
+      }
     }
   } catch (err) {
     console.error('[Qwen-VL] API call failed:', err.message)
