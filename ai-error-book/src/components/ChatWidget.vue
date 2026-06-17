@@ -1,26 +1,46 @@
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Close, ArrowDown } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 const isOpen = ref(false)
+const isFlipping = ref(false)
 const inputMessage = ref('')
 const messages = ref([
   {
     role: 'assistant',
-    content: '你好！我是你的AI数学辅导助手，有任何数学问题都可以随时问我~'
+    content: '你好！我是你的AI数学辅导助手，有任何数学问题都可以随时问我~',
+    typed: true
   }
 ])
 const isLoading = ref(false)
 const messagesContainer = ref(null)
 
+// 打字机效果：存储每条消息的当前显示文本
+const typingMap = ref(new Map())
+const typingCursor = ref(new Map())
+
 const toggleChat = () => {
-  isOpen.value = !isOpen.value
+  if (isFlipping.value) return
+  isFlipping.value = true
+  setTimeout(() => {
+    isOpen.value = !isOpen.value
+    setTimeout(() => {
+      isFlipping.value = false
+    }, 600)
+  }, 300)
 }
 
 const closeChat = () => {
-  isOpen.value = false
+  if (isFlipping.value) return
+  isFlipping.value = true
+  setTimeout(() => {
+    isOpen.value = false
+    setTimeout(() => {
+      isFlipping.value = false
+    }, 600)
+  }, 300)
 }
 
 const scrollToBottom = async () => {
@@ -32,11 +52,40 @@ const scrollToBottom = async () => {
 
 watch(() => messages.value.length, scrollToBottom)
 
+// 打字机效果
+const typeWriter = (index, fullText, speed = 30) => {
+  typingMap.value.set(index, '')
+  typingCursor.value.set(index, true)
+  let i = 0
+  const timer = setInterval(() => {
+    typingMap.value.set(index, fullText.substring(0, i + 1))
+    i++
+    scrollToBottom()
+    if (i >= fullText.length) {
+      clearInterval(timer)
+      typingCursor.value.set(index, false)
+      messages.value[index].typed = true
+    }
+  }, speed)
+}
+
+const getDisplayText = (msg, index) => {
+  if (msg.role === 'user' || msg.typed) {
+    return msg.content
+  }
+  const typed = typingMap.value.get(index)
+  return typed !== undefined ? typed : msg.content
+}
+
+const isTyping = (index) => {
+  return typingCursor.value.get(index) || false
+}
+
 const sendMessage = async () => {
   const text = inputMessage.value.trim()
   if (!text || isLoading.value) return
 
-  messages.value.push({ role: 'user', content: text })
+  messages.value.push({ role: 'user', content: text, typed: true })
   inputMessage.value = ''
   isLoading.value = true
 
@@ -53,20 +102,20 @@ const sendMessage = async () => {
     )
 
     if (data.success) {
-      messages.value.push({ role: 'assistant', content: data.data.reply })
+      const idx = messages.value.length
+      messages.value.push({ role: 'assistant', content: data.data.reply, typed: false })
+      typeWriter(idx, data.data.reply, 25)
     } else {
       ElMessage.error(data.message || 'AI响应失败')
-      messages.value.push({
-        role: 'assistant',
-        content: '抱歉，我暂时无法回答这个问题，请稍后再试。'
-      })
+      const idx = messages.value.length
+      messages.value.push({ role: 'assistant', content: '抱歉，我暂时无法回答这个问题，请稍后再试。', typed: false })
+      typeWriter(idx, '抱歉，我暂时无法回答这个问题，请稍后再试。', 25)
     }
   } catch (err) {
     ElMessage.error(err.response?.data?.message || '网络请求失败')
-    messages.value.push({
-      role: 'assistant',
-      content: '抱歉，网络出了点问题，请检查网络后重试。'
-    })
+    const idx = messages.value.length
+    messages.value.push({ role: 'assistant', content: '抱歉，网络出了点问题，请检查网络后重试。', typed: false })
+    typeWriter(idx, '抱歉，网络出了点问题，请检查网络后重试。', 25)
   } finally {
     isLoading.value = false
   }
@@ -81,20 +130,20 @@ const handleKeydown = (e) => {
 </script>
 
 <template>
-  <div class="chat-widget">
-    <!-- 悬浮球 -->
-    <div
-      v-if="!isOpen"
-      class="chat-bubble"
-      @click="toggleChat"
-    >
-      <el-icon :size="28"><ChatDotRound /></el-icon>
-      <span class="chat-bubble-text">AI辅导</span>
-    </div>
+  <div class="chat-widget" :class="{ flipping: isFlipping }">
+    <div class="chat-flipper" :class="{ flipped: isOpen }">
+      <!-- 悬浮球（正面） -->
+      <div
+        v-if="!isOpen"
+        class="chat-bubble chat-front"
+        @click="toggleChat"
+      >
+        <el-icon :size="28"><ChatDotRound /></el-icon>
+        <span class="chat-bubble-text">AI辅导</span>
+      </div>
 
-    <!-- 对话窗口 -->
-    <transition name="chat-fade">
-      <div v-if="isOpen" class="chat-window">
+      <!-- 对话窗口（背面） -->
+      <div v-if="isOpen" class="chat-window chat-back">
         <!-- 头部 -->
         <div class="chat-header">
           <div class="chat-title">
@@ -127,7 +176,10 @@ const handleKeydown = (e) => {
               />
             </div>
             <div class="chat-bubble-content">
-              <div class="chat-text" v-html="msg.content.replace(/\n/g, '<br>')"></div>
+              <div class="chat-text">
+                <span v-html="getDisplayText(msg, index).replace(/\n/g, '<br>')"></span>
+                <span v-if="isTyping(index)" class="typing-cursor">|</span>
+              </div>
             </div>
           </div>
 
@@ -169,7 +221,7 @@ const handleKeydown = (e) => {
           </el-button>
         </div>
       </div>
-    </transition>
+    </div>
   </div>
 </template>
 
@@ -179,6 +231,16 @@ const handleKeydown = (e) => {
   right: 20px;
   top: 30%;
   z-index: 1000;
+  perspective: 1000px;
+}
+
+.chat-flipper {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.chat-flipper.flipped {
+  transform: rotateY(180deg);
 }
 
 /* 悬浮球 */
@@ -196,6 +258,7 @@ const handleKeydown = (e) => {
   box-shadow: 0 4px 16px rgba(30, 111, 219, 0.35);
   transition: all 0.3s ease;
   animation: pulse 2s infinite;
+  backface-visibility: hidden;
 }
 
 .chat-bubble:hover {
@@ -223,6 +286,8 @@ const handleKeydown = (e) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  backface-visibility: hidden;
+  transform: rotateY(180deg);
 }
 
 .chat-header {
@@ -264,6 +329,18 @@ const handleKeydown = (e) => {
   gap: 10px;
   margin-bottom: 16px;
   align-items: flex-start;
+  animation: messageSlideIn 0.3s ease;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .chat-message-user {
@@ -289,6 +366,19 @@ const handleKeydown = (e) => {
   word-break: break-word;
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* 打字机光标 */
+.typing-cursor {
+  display: inline-block;
+  color: #1e6fdb;
+  font-weight: bold;
+  animation: cursorBlink 0.8s infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 /* 加载动画 */
@@ -333,18 +423,6 @@ const handleKeydown = (e) => {
   height: 40px;
   padding: 0 20px;
   border-radius: 8px;
-}
-
-/* 过渡动画 */
-.chat-fade-enter-active,
-.chat-fade-leave-active {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.chat-fade-enter-from,
-.chat-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.85) translateY(20px);
 }
 
 /* 移动端适配 */

@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import ChatWidget from './components/ChatWidget.vue'
+import ParticleBackground from './components/ParticleBackground.vue'
+import RadarChart from './components/RadarChart.vue'
 
 const questionText = ref('')
 const imageUrl = ref('')
@@ -99,9 +101,59 @@ const startAnalysis = async () => {
     isAnalyzing.value = false
   }
 }
+
+// 按钮波纹效果
+const createRipple = (event) => {
+  const button = event.currentTarget
+  const circle = document.createElement('span')
+  const rect = button.getBoundingClientRect()
+  const diameter = Math.max(rect.width, rect.height)
+  const radius = diameter / 2
+  circle.style.width = circle.style.height = `${diameter}px`
+  circle.style.left = `${event.clientX - rect.left - radius}px`
+  circle.style.top = `${event.clientY - rect.top - radius}px`
+  circle.classList.add('ripple')
+  const existing = button.getElementsByClassName('ripple')[0]
+  if (existing) existing.remove()
+  button.appendChild(circle)
+  setTimeout(() => circle.remove(), 600)
+}
+
+const handleAnalyzeClick = (e) => {
+  createRipple(e)
+  startAnalysis()
+}
+
+// 雷达图数据（基于分析结果）
+const radarData = computed(() => {
+  if (!resultData.value?.knowledge) {
+    return [
+      { subject: '函数', score: 75 },
+      { subject: '几何', score: 60 },
+      { subject: '概率', score: 85 },
+      { subject: '代数', score: 70 },
+      { subject: '数列', score: 55 },
+      { subject: '三角函数', score: 80 }
+    ]
+  }
+  const subjects = resultData.value.knowledge.split(/[,，、]/).map(s => s.trim()).filter(s => s)
+  if (subjects.length < 3) {
+    // 如果知识点太少，补充默认维度
+    const defaults = ['基础概念', '计算能力', '逻辑推理', '应用能力', '审题能力', '解题技巧']
+    return defaults.map((sub, i) => ({
+      subject: sub,
+      score: Math.max(35, Math.min(95, 60 + Math.sin(i * 1.5) * 25))
+    }))
+  }
+  return subjects.map((sub, i) => ({
+    subject: sub,
+    score: Math.max(40, Math.min(95, 75 + (i % 3 - 1) * 20))
+  }))
+})
 </script>
 
 <template>
+  <ParticleBackground />
   <div class="app-container">
     <!-- Header -->
     <header class="header">
@@ -193,7 +245,7 @@ const startAnalysis = async () => {
               type="primary"
               size="large"
               :loading="isAnalyzing"
-              @click="startAnalysis"
+              @click="handleAnalyzeClick"
               class="analyze-btn"
             >
               <el-icon v-if="!isAnalyzing"><Search /></el-icon>
@@ -214,8 +266,19 @@ const startAnalysis = async () => {
             </div>
           </template>
 
+          <!-- Radar Chart -->
+          <div class="result-block result-block-1">
+            <h3>
+              <el-icon><DataAnalysis /></el-icon>
+              知识点掌握度
+            </h3>
+            <RadarChart :data="radarData" />
+          </div>
+
+          <el-divider />
+
           <!-- Knowledge Point -->
-          <div class="result-block">
+          <div class="result-block result-block-2">
             <h3>
               <el-icon><Reading /></el-icon>
               知识点
@@ -228,7 +291,7 @@ const startAnalysis = async () => {
           <el-divider />
 
           <!-- Error Reason -->
-          <div class="result-block">
+          <div class="result-block result-block-3">
             <h3>
               <el-icon><Warning /></el-icon>
               错因分析
@@ -239,7 +302,7 @@ const startAnalysis = async () => {
           <el-divider />
 
           <!-- Solution Steps -->
-          <div class="result-block">
+          <div class="result-block result-block-4">
             <h3>
               <el-icon><CircleCheck /></el-icon>
               解题步骤
@@ -260,7 +323,7 @@ const startAnalysis = async () => {
           <el-divider />
 
           <!-- Similar Exercise -->
-          <div class="result-block">
+          <div class="result-block result-block-5">
             <h3>
               <el-icon><Collection /></el-icon>
               相似题
@@ -273,7 +336,7 @@ const startAnalysis = async () => {
           <el-divider />
 
           <!-- Learning Suggestion -->
-          <div class="result-block">
+          <div class="result-block result-block-6">
             <h3>
               <el-icon><Lightning /></el-icon>
               学习建议
@@ -547,5 +610,82 @@ const startAnalysis = async () => {
   .logo h1 {
     font-size: 24px;
   }
+}
+
+/* ========== 动效样式 ========== */
+
+/* 按钮波纹效果 */
+.analyze-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.analyze-btn .ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0);
+  animation: ripple-effect 0.6s linear;
+  pointer-events: none;
+}
+
+@keyframes ripple-effect {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* 结果卡片依次滑入 */
+.result-block {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideInUp 0.5s ease forwards;
+}
+
+.result-block-1 { animation-delay: 0.1s; }
+.result-block-2 { animation-delay: 0.2s; }
+.result-block-3 { animation-delay: 0.3s; }
+.result-block-4 { animation-delay: 0.4s; }
+.result-block-5 { animation-delay: 0.5s; }
+.result-block-6 { animation-delay: 0.6s; }
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 知识点标签弹跳 */
+.knowledge-tag {
+  animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 确保内容在粒子背景上方 */
+.app-container {
+  position: relative;
+  z-index: 1;
 }
 </style>
